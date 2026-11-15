@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Salemczyk — Turniej Salem</title>
+<meta name="theme-color" content="#160d16">
+<style>
+:root{--bg:#100b10;--panel:#211520;--panel2:#2c1a27;--gold:#d7b56d;--gold2:#f0d99b;--wine:#741d40;--text:#f5eee4;--muted:#bbaeb5;--line:#563345;--green:#91c49b;--red:#d98b8b}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at top,#3a172a 0,#160e16 45%,#0d090e 100%);color:var(--text);font:15px/1.5 Georgia,serif}
+header{padding:28px 16px 20px;text-align:center;border-bottom:1px solid var(--line);background:linear-gradient(180deg,#28101fee,#140d15cc)}
+.crest{font-size:28px;color:var(--gold)}h1{margin:4px 0;color:var(--gold2);font-size:clamp(29px,6vw,46px);letter-spacing:4px;text-transform:uppercase}header p{margin:0;color:var(--muted);letter-spacing:2px;font:11px Arial,sans-serif;text-transform:uppercase}
+nav{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;padding:14px}
+button,.btn{border:1px solid var(--gold);background:linear-gradient(#70203f,#4a142d);color:#fff2d5;padding:10px 15px;border-radius:7px;cursor:pointer;font-weight:bold;font-family:Arial,sans-serif}
+button.secondary{background:#211620;border-color:var(--line);color:var(--text)}button.danger{border-color:#a34b5c;background:#401725}button:disabled{opacity:.45;cursor:not-allowed}
+main{max-width:1120px;margin:0 auto;padding:10px 16px 55px}.panel{background:linear-gradient(145deg,#241722,#180f18);border:1px solid var(--line);border-radius:12px;padding:18px;margin:12px 0;box-shadow:0 12px 35px #0005}
+h2{color:var(--gold2);margin:0 0 12px;font-size:22px}h3{color:var(--gold);margin:0 0 8px}
+.muted{color:var(--muted)}.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.row>*{flex:1}
+input,textarea,select{background:#100b10;border:1px solid #694356;color:var(--text);padding:10px;border-radius:6px;min-width:0;width:100%;font:14px Arial}
+label{display:block;color:var(--muted);font:12px Arial;margin:8px 0 5px}.hidden{display:none!important}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(125px,1fr));gap:10px}.stat{background:#130d14;border:1px solid var(--line);border-radius:8px;padding:12px;text-align:center}.stat strong{display:block;color:var(--gold2);font-size:25px}
+.bracket{display:flex;gap:14px;overflow-x:auto;padding:10px 2px 18px;align-items:flex-start}.round{min-width:225px;flex:1}.round h3{text-align:center;font-size:14px;letter-spacing:1px;text-transform:uppercase}.match{background:#150e16;border:1px solid var(--line);border-radius:8px;margin:12px 0;padding:10px}.player{display:flex;justify-content:space-between;gap:8px;padding:7px 5px;border-bottom:1px solid #382331}.player:last-child{border:0}.winner{color:var(--green);font-weight:bold}.tag{font:10px Arial;color:var(--gold);text-transform:uppercase;letter-spacing:1px}.empty{text-align:center;padding:28px;color:var(--muted);border:1px dashed var(--line);border-radius:8px}
+.small{font:12px Arial;color:var(--muted)}.notice{border-left:3px solid var(--gold);padding:9px 12px;background:#2a1b25;color:#e7d8c4;margin:10px 0}.status{display:inline-block;border:1px solid var(--line);border-radius:99px;padding:4px 10px;font:11px Arial;color:var(--gold2)}.match-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.match-actions button{font-size:12px;padding:7px 9px}
+#toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:#2c1a27;border:1px solid var(--gold);padding:10px 16px;border-radius:8px;display:none;z-index:10;max-width:90vw}
+@media(max-width:600px){header{padding-top:22px}.panel{padding:14px}.row{display:block}.row>*{margin:5px 0}.round{min-width:210px}}
+</style>
+</head>
+<body>
+<header><div class="crest">✦ ✧ ✦</div><h1>Salemczyk</h1><p>Oficjalny turniej szkoły Salem</p></header>
+<nav><button id="publicTab">Tablica turniejowa</button><button class="secondary" id="adminTab">Panel organizatora</button></nav>
+<main>
+<section id="publicView">
+ <div class="panel"><div class="row"><div><h2>Witaj na arenie Salem</h2><div class="muted">Śledź pojedynki, wyniki i drogę uczestników do finału.</div></div><div style="text-align:right"><span class="status" id="statusLabel">Ładowanie…</span></div></div>
+ <div class="stats" style="margin-top:16px"><div class="stat"><strong id="pCount">0</strong><span class="small">uczestników</span></div><div class="stat"><strong id="mCount">0</strong><span class="small">pojedynków</span></div><div class="stat"><strong id="rCount">0</strong><span class="small">rund</span></div><div class="stat"><strong id="doneCount">0</strong><span class="small">rozegranych</span></div></div></div>
+ <div class="panel"><h2>Drabinka turniejowa</h2><div id="publicBracket" class="empty">Pobieranie danych…</div></div>
+ <div class="panel"><h2>Informacje</h2><p class="muted">Wyniki zatwierdza organizatorka turnieju. Tablica odświeża się automatycznie.</p><p class="small" id="lastUpdated"></p></div>
+</section>
+<section id="adminView" class="hidden">
+ <div class="panel" id="loginPanel"><h2>Wejście organizatora</h2><p class="muted">Zaloguj się kontem utworzonym w Supabase Authentication.</p><label>Adres e-mail</label><input id="email" type="email" autocomplete="username"><label>Hasło</label><input id="password" type="password" autocomplete="current-password"><div class="row" style="margin-top:10px"><button id="loginBtn">Zaloguj się</button><button class="secondary" id="logoutBtnLogin">Wyloguj</button></div></div>
+ <div id="adminTools" class="hidden">
+  <div class="panel"><div class="row"><div><h2>Panel organizatora</h2><span class="small" id="loggedEmail"></span></div><button class="secondary" id="logoutBtn">Wyloguj</button></div></div>
+  <div class="panel"><h2>Uczestnicy</h2><p class="muted">Dodawaj osoby pojedynczo lub wklej listę — każda osoba w osobnej linii. Listę można edytować przed losowaniem.</p><label>Dodaj uczestników</label><textarea id="names" rows="5" placeholder="Mia Reyes&#10;Vespera Nyx&#10;Carmen Launay"></textarea><div class="row" style="margin-top:10px"><button id="addBtn">Dodaj do listy</button><button class="secondary" id="drawBtn">Losuj i utwórz drabinkę</button></div><div id="participantList" class="small" style="margin-top:12px"></div><div class="small" style="margin-top:8px">Usuwanie uczestników jest dostępne przed utworzeniem drabinki. Po losowaniu zmiany wymagają wyczyszczenia turnieju.</div></div>
+  <div class="panel"><h2>Wyniki pojedynków</h2><p class="muted">Wybierz zwycięzcę po zakończeniu meczu. Zwycięzca automatycznie awansuje do kolejnej rundy po zakończeniu całej bieżącej rundy.</p><div id="adminMatches" class="empty">Najpierw dodaj uczestników i utwórz drabinkę.</div></div>
+  <div class="panel"><h2>Ustawienia turnieju</h2><label>Nazwa turnieju</label><input id="tournamentName" value="Salemczyk"><div class="row" style="margin-top:10px"><button id="saveName">Zapisz nazwę</button><button class="danger" id="resetBtn">Wyczyść turniej</button></div></div>
+ </div>
+</section>
+</main><div id="toast"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const SUPABASE_URL='https://yzhnxaurzseszqwkywrk.supabase.co';
+const SUPABASE_PUBLISHABLE_KEY='sb_publishable_nkykM2S7KwHJgIKiCDDwOw_J8S112Hk';
+const db=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY);
+const $=id=>document.getElementById(id);let session=null,participants=[],rounds=[],matches=[],tournament=null;
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function toast(s){let t=$('toast');t.textContent=s;t.style.display='block';setTimeout(()=>t.style.display='none',3500)}
+function show(tab){$('publicView').classList.toggle('hidden',tab!=='public');$('adminView').classList.toggle('hidden',tab!=='admin')}
+$('publicTab').onclick=()=>show('public');$('adminTab').onclick=()=>show('admin');
+async function loadAll(){
+ const [t,p,r,m]=await Promise.all([
+  db.from('salem_tournament').select('*').eq('id',true).maybeSingle(),
+  db.from('salem_participants').select('*').order('created_at'),
+  db.from('salem_rounds').select('*').order('round_number'),
+  db.from('salem_matches').select('*').order('match_number')
+ ]);
+ const err=[t,p,r,m].find(x=>x.error);if(err){console.error(err.error);$('publicBracket').className='notice';$('publicBracket').textContent='Nie udało się pobrać danych. Sprawdź konfigurację projektu.';return}
+ tournament=t.data;participants=p.data||[];rounds=r.data||[];matches=m.data||[];
+ render();
+}
+function playerName(id){return participants.find(p=>p.id===id)?.name||'—'}
+function roundLabel(r){return r.label||('Runda '+r.round_number)}
+function renderBracket(target,admin){
+ if(!rounds.length){target.className='empty';target.textContent='Drabinka pojawi się po dodaniu uczestników i wylosowaniu par.';return}
+ target.className='bracket';
+ target.innerHTML=rounds.map(r=>{
+  const ms=matches.filter(m=>m.round_id===r.id).sort((a,b)=>a.match_number-b.match_number);
+  return `<div class="round"><h3>${esc(roundLabel(r))}</h3>${ms.map(m=>{
+   const a=m.player1_id?playerName(m.player1_id):'Wolny los',b=m.player2_id?playerName(m.player2_id):'Wolny los';
+   return `<div class="match"><div class="tag">Pojedynek ${m.match_number}${m.status==='bye'?' · wolny los':''}</div>
+    <div class="player ${m.winner_id===m.player1_id&&m.winner_id?'winner':''}"><span>${esc(a)}</span>${m.winner_id===m.player1_id&&m.winner_id?'✓':''}</div>
+    <div class="player ${m.winner_id===m.player2_id&&m.winner_id?'winner':''}"><span>${esc(b)}</span>${m.winner_id===m.player2_id&&m.winner_id?'✓':''}</div>
+    ${m.scheduled_at?`<div class="small">Termin: ${new Date(m.scheduled_at).toLocaleString('pl-PL')}</div>`:''}
+    ${admin&&m.status==='pending'&&m.player1_id&&m.player2_id?`<div class="small" style="margin-top:8px">Zatwierdź zwycięzcę:</div><div class="match-actions"><button class="secondary" data-win="${m.id}" data-player="${m.player1_id}">${esc(a)}</button><button class="secondary" data-win="${m.id}" data-player="${m.player2_id}">${esc(b)}</button></div>`:''}
+    ${m.winner_id?`<div class="tag" style="margin-top:8px">Awans: ${esc(playerName(m.winner_id))}</div>`:''}
+   </div>`}).join('')}</div>`;
+ }).join('');
+ if(admin)target.querySelectorAll('[data-win]').forEach(b=>b.onclick=()=>setWinner(b.dataset.win,b.dataset.player));
+}
+function render(){
+ $('pCount').textContent=participants.length;$('mCount').textContent=matches.length;$('rCount').textContent=rounds.length;$('doneCount').textContent=matches.filter(m=>m.winner_id||m.status==='bye').length;
+ $('statusLabel').textContent=tournament?.status==='finished'?'Turniej zakończony':tournament?.status==='active'?'Turniej trwa':'Zapisy / przygotowania';
+ $('lastUpdated').textContent='Ostatnie odświeżenie: '+new Date().toLocaleTimeString('pl-PL');
+ renderBracket($('publicBracket'),false);
+ if(session){renderBracket($('adminMatches'),true);$('participantList').innerHTML=participants.length?`<b>Na liście (${participants.length}):</b><ul>${participants.map(p=>`<li>${esc(p.name)} ${rounds.length?'':`<button class="danger" data-del="${p.id}" style="padding:3px 7px">Usuń</button>`}</li>`).join('')}</ul>`:'Lista uczestników jest pusta.';$('participantList').querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>deleteParticipant(b.dataset.del));$('tournamentName').value=tournament?.name||'Salemczyk'}
+}
+async function addParticipants(){
+ if(rounds.length)return toast('Drabinka już istnieje. Wyczyść turniej, aby zmienić listę.');
+ let names=$('names').value.split(/\n/).map(s=>s.trim()).filter(Boolean);if(!names.length)return;
+ let existing=new Set(participants.map(p=>p.name.toLowerCase()));names=[...new Set(names.filter(n=>!existing.has(n.toLowerCase())))];
+ if(!names.length)return toast('Te osoby są już na liście.');
+ const {error}=await db.from('salem_participants').insert(names.map(name=>({name})));
+ if(error)return toast('Błąd dodawania: '+error.message);$('names').value='';await loadAll();toast('Dodano uczestników.');
+}
+async function deleteParticipant(id){if(!confirm('Usunąć tę osobę z listy?'))return;const {error}=await db.from('salem_participants').delete().eq('id',id);if(error)return toast(error.message);await loadAll()}
+function shuffled(a){for(let i=a.length-1;i>0;i--){let j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+function labelFor(n){if(n===1)return 'Finał';if(n===2)return 'Półfinał';if(n===4)return 'Ćwierćfinał';return 'Runda'}
+async function drawBracket(){
+ if(participants.length<2)return toast('Dodaj co najmniej 2 uczestników.');
+ if(rounds.length&&!confirm('Istniejąca drabinka zostanie zastąpiona. Kontynuować?'))return;
+ if(rounds.length){const {error}=await db.from('salem_rounds').delete().eq('tournament_id',true);if(error)return toast(error.message)}
+ let players=shuffled([...participants]);let size=1;while(size<players.length)size*=2;
+ // Rozmieść wolne losy tak, aby nie powstawały puste pojedynki.
+ const matchCount=size/2, playedMatches=players.length-matchCount;
+ let slots=[];
+ for(let i=0;i<playedMatches;i++)slots.push(players[i*2].id,players[i*2+1].id);
+ for(let i=playedMatches*2;i<players.length;i++)slots.push(players[i].id,null);
+ const hasByes=players.length<size;
+ const firstLabel=hasByes?'Runda wstępna':labelFor(matchCount);
+ const {data:r,error:re}=await db.from('salem_rounds').insert({round_number:1,label:firstLabel,status:'active'}).select().single();if(re)return toast(re.message);
+ let rows=[];for(let i=0;i<matchCount;i++){let a=slots[i*2]||null,b=slots[i*2+1]||null;rows.push({round_id:r.id,match_number:i+1,player1_id:a,player2_id:b,winner_id:a&&!b?a:(!a&&b?b:null),status:(a&&!b)||(!a&&b)?'bye':'pending'})}
+ const {error:me}=await db.from('salem_matches').insert(rows);if(me)return toast(me.message);
+ await db.from('salem_tournament').update({status:'active',updated_at:new Date().toISOString()}).eq('id',true);
+ await loadAll();await advanceIfReady();toast('Drabinka została utworzona!');
+}
+async function setWinner(matchId,winnerId){
+ const match=matches.find(m=>m.id===matchId);if(!match||match.winner_id)return;
+ if(!confirm('Zatwierdzić zwycięstwo: '+playerName(winnerId)+'?'))return;
+ const {error}=await db.from('salem_matches').update({winner_id:winnerId,status:'finished',updated_at:new Date().toISOString()}).eq('id',matchId);
+ if(error)return toast('Nie udało się zapisać wyniku: '+error.message);
+ await loadAll();await advanceIfReady();toast('Wynik zapisany.');
+}
+async function advanceIfReady(){
+ if(!rounds.length)return;
+ const current=rounds[rounds.length-1],ms=matches.filter(m=>m.round_id===current.id);
+ if(!ms.length||ms.some(m=>!m.winner_id))return;
+ if(ms.length===1){await db.from('salem_rounds').update({status:'finished'}).eq('id',current.id);await db.from('salem_tournament').update({status:'finished',updated_at:new Date().toISOString()}).eq('id',true);await loadAll();return}
+ const winners=ms.sort((a,b)=>a.match_number-b.match_number).map(m=>m.winner_id);
+ const nextWinners=[];for(let i=0;i<winners.length;i+=2){nextWinners.push([winners[i]||null,winners[i+1]||null])}
+ if(rounds.some(r=>r.round_number===current.round_number+1))return;
+ const {data:nr,error}=await db.from('salem_rounds').insert({round_number:current.round_number+1,label:labelFor(nextWinners.length),status:'active'}).select().single();if(error)return toast(error.message);
+ const rows=nextWinners.map((pair,i)=>({round_id:nr.id,match_number:i+1,player1_id:pair[0],player2_id:pair[1],winner_id:pair[0]&&!pair[1]?pair[0]:null,status:pair[0]&&!pair[1]?'bye':'pending'}));
+ const {error:me}=await db.from('salem_matches').insert(rows);if(me)return toast(me.message);
+ await db.from('salem_rounds').update({status:'finished'}).eq('id',current.id);await loadAll();await advanceIfReady();
+}
+$('addBtn').onclick=addParticipants;$('drawBtn').onclick=drawBracket;
+$('saveName').onclick=async()=>{const {error}=await db.from('salem_tournament').update({name:$('tournamentName').value.trim()||'Salemczyk',updated_at:new Date().toISOString()}).eq('id',true);if(error)return toast(error.message);await loadAll();toast('Zapisano nazwę turnieju.')};
+$('resetBtn').onclick=async()=>{if(!confirm('Usunąć całą drabinkę, rundy i listę uczestników? Tej operacji nie można cofnąć.'))return;await db.from('salem_rounds').delete().eq('tournament_id',true);await db.from('salem_participants').delete().neq('id','00000000-0000-0000-0000-000000000000');await db.from('salem_tournament').update({status:'registration',updated_at:new Date().toISOString()}).eq('id',true);await loadAll();toast('Turniej wyczyszczony.')};
+$('loginBtn').onclick=async()=>{const {data,error}=await db.auth.signInWithPassword({email:$('email').value,password:$('password').value});if(error)return toast('Logowanie nieudane: '+error.message);session=data.session;showAdmin();await loadAll();toast('Zalogowano.')};
+$('logoutBtn').onclick=async()=>{await db.auth.signOut();session=null;showAdmin();toast('Wylogowano.')};
+$('logoutBtnLogin').onclick=async()=>{await db.auth.signOut();toast('Wylogowano.')};
+function showAdmin(){ $('loginPanel').classList.toggle('hidden',!!session);$('adminTools').classList.toggle('hidden',!session);$('loggedEmail').textContent=session?.user?.email||''}
+db.auth.onAuthStateChange((_event,s)=>{session=s;showAdmin();if(s)loadAll()});
+async function init(){if(SUPABASE_PUBLISHABLE_KEY==='WKLEJ_TUTAJ_PUBLISHABLE_KEY'){$('publicBracket').className='notice';$('publicBracket').textContent='Przed uruchomieniem wstaw klucz Publishable do pliku index.html zgodnie z instrukcją.';return}const {data}=await db.auth.getSession();session=data.session;showAdmin();await loadAll();setInterval(loadAll,10000);db.channel('salem-live').on('postgres_changes',{event:'*',schema:'public',table:'salem_matches'},loadAll).on('postgres_changes',{event:'*',schema:'public',table:'salem_participants'},loadAll).on('postgres_changes',{event:'*',schema:'public',table:'salem_rounds'},loadAll).subscribe()}
+init();
+</script></body></html>
