@@ -40,7 +40,7 @@ label{display:block;color:var(--muted);font:12px Arial;margin:8px 0 5px}.hidden{
  <div class="panel" id="loginPanel"><h2>Wejście organizatora</h2><p class="muted">Zaloguj się kontem utworzonym w Supabase Authentication.</p><label>Adres e-mail</label><input id="email" type="email" autocomplete="username"><label>Hasło</label><input id="password" type="password" autocomplete="current-password"><div class="row" style="margin-top:10px"><button id="loginBtn">Zaloguj się</button><button class="secondary" id="logoutBtnLogin">Wyloguj</button></div></div>
  <div id="adminTools" class="hidden">
   <div class="panel"><div class="row"><div><h2>Panel organizatora</h2><span class="small" id="loggedEmail"></span></div><button class="secondary" id="logoutBtn">Wyloguj</button></div></div>
-  <div class="panel"><h2>Uczestnicy</h2><p class="muted">Dodawaj osoby pojedynczo lub wklej listę — każda osoba w osobnej linii. Listę można edytować przed losowaniem.</p><label>Dodaj uczestników</label><textarea id="names" rows="5" placeholder="Mia Reyes&#10;Vespera Nyx&#10;Carmen Launay"></textarea><div class="row" style="margin-top:10px"><button id="addBtn">Dodaj do listy</button><button class="secondary" id="drawBtn">Losuj i utwórz drabinkę</button></div><div id="participantList" class="small" style="margin-top:12px"></div><div class="small" style="margin-top:8px">Usuwanie uczestników jest dostępne przed utworzeniem drabinki. Po losowaniu zmiany wymagają wyczyszczenia turnieju.</div></div>
+  <div class="panel"><h2>Uczestnicy</h2><p class="muted">Dodawaj osoby pojedynczo lub wklej listę — każda osoba w osobnej linii. Nazwy uczestników można poprawiać także po losowaniu. Usuwanie jest dostępne przed utworzeniem drabinki.</p><label>Dodaj uczestników</label><textarea id="names" rows="5" placeholder="Mia Reyes&#10;Vespera Nyx&#10;Carmen Launay"></textarea><div class="row" style="margin-top:10px"><button id="addBtn">Dodaj do listy</button><button class="secondary" id="drawBtn">Losuj i utwórz drabinkę</button></div><div id="participantList" class="small" style="margin-top:12px"></div><div class="small" style="margin-top:8px">Po losowaniu nie usuwaj uczestników z drabinki — możesz za to poprawić ich nazwy bez utraty wyników.</div></div>
   <div class="panel"><h2>Wyniki pojedynków</h2><p class="muted">Wybierz zwycięzcę po zakończeniu meczu. Zwycięzca automatycznie awansuje do kolejnej rundy po zakończeniu całej bieżącej rundy.</p><div id="adminMatches" class="empty">Najpierw dodaj uczestników i utwórz drabinkę.</div></div>
   <div class="panel"><h2>Ustawienia turnieju</h2><label>Nazwa turnieju</label><input id="tournamentName" value="Salemczyk"><div class="row" style="margin-top:10px"><button id="saveName">Zapisz nazwę</button><button class="danger" id="resetBtn">Wyczyść turniej</button></div></div>
  </div>
@@ -107,10 +107,12 @@ function renderBracket(target,admin){
      </div>`:''}
     ${admin&&m.status==='pending'&&!m.winner_id&&m.player1_id&&m.player2_id?`<div class="small" style="margin-top:8px">Zatwierdź zwycięzcę:</div><div class="match-actions"><button class="secondary" data-win="${m.id}" data-player="${m.player1_id}">${esc(a)}</button><button class="secondary" data-win="${m.id}" data-player="${m.player2_id}">${esc(b)}</button></div>`:''}
     ${m.winner_id?`<div class="tag" style="margin-top:8px">Awans: ${esc(playerName(m.winner_id))}</div>`:''}
+    ${admin&&m.winner_id&&m.player1_id&&m.player2_id?`<div class="match-actions"><button class="secondary" data-correct="${m.id}" data-player="${m.player1_id}">Ustaw zwycięzcę: ${esc(a)}</button><button class="secondary" data-correct="${m.id}" data-player="${m.player2_id}">Ustaw zwycięzcę: ${esc(b)}</button></div>`:''}
    </div>`}).join('')}</div>`;
  }).join('');
  if(admin){
   target.querySelectorAll('[data-win]').forEach(b=>b.onclick=()=>setWinner(b.dataset.win,b.dataset.player));
+  target.querySelectorAll('[data-correct]').forEach(b=>b.onclick=()=>correctWinner(b.dataset.correct,b.dataset.player));
   target.querySelectorAll('[data-save-match]').forEach(b=>b.onclick=()=>saveMatchDetails(b.dataset.saveMatch));
  }
 }
@@ -138,7 +140,7 @@ function render(){
  $('lastUpdated').textContent='Ostatnie odświeżenie: '+new Date().toLocaleTimeString('pl-PL');
  renderBracket($('publicBracket'),false);
  renderPublicLists();
- if(session){renderBracket($('adminMatches'),true);$('participantList').innerHTML=participants.length?`<b>Na liście (${participants.length}):</b><ul>${participants.map(p=>`<li>${esc(p.name)} ${rounds.length?'':`<button class="danger" data-del="${p.id}" style="padding:3px 7px">Usuń</button>`}</li>`).join('')}</ul>`:'Lista uczestników jest pusta.';$('participantList').querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>deleteParticipant(b.dataset.del));$('tournamentName').value=tournament?.name||'Salemczyk'}
+ if(session){renderBracket($('adminMatches'),true);$('participantList').innerHTML=participants.length?`<b>Na liście (${participants.length}):</b><ul>${participants.map(p=>`<li>${esc(p.name)} <button class="secondary" data-edit="${p.id}" style="padding:3px 7px">Edytuj nazwę</button> ${rounds.length?'':`<button class="danger" data-del="${p.id}" style="padding:3px 7px">Usuń</button>`}</li>`).join('')}</ul>`:'Lista uczestników jest pusta.';$('participantList').querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>deleteParticipant(b.dataset.del));$('participantList').querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>editParticipant(b.dataset.edit));$('tournamentName').value=tournament?.name||'Salemczyk'}
 }
 async function addParticipants(){
  if(rounds.length)return toast('Drabinka już istnieje. Wyczyść turniej, aby zmienić listę.');
@@ -149,6 +151,18 @@ async function addParticipants(){
  if(error)return toast('Błąd dodawania: '+error.message);$('names').value='';await loadAll();toast('Dodano uczestników.');
 }
 async function deleteParticipant(id){if(!confirm('Usunąć tę osobę z listy?'))return;const {error}=await db.from('salem_participants').delete().eq('id',id);if(error)return toast(error.message);await loadAll()}
+async function editParticipant(id){
+ const person=participants.find(p=>p.id===id);if(!person)return;
+ const name=prompt('Popraw nazwę uczestnika:',person.name);
+ if(name===null)return;
+ const clean=name.trim();if(!clean)return toast('Nazwa uczestnika nie może być pusta.');
+ if(clean===person.name)return;
+ const duplicate=participants.some(p=>p.id!==id&&p.name.toLowerCase()===clean.toLowerCase());
+ if(duplicate)return toast('Uczestnik o takiej nazwie już istnieje.');
+ const {error}=await db.from('salem_participants').update({name:clean}).eq('id',id);
+ if(error)return toast('Nie udało się poprawić nazwy: '+error.message);
+ await loadAll();toast('Nazwa uczestnika została poprawiona.');
+}
 function shuffled(a){for(let i=a.length-1;i>0;i--){let j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
 function labelFor(n){if(n===1)return 'Finał';if(n===2)return 'Półfinał';if(n===4)return 'Ćwierćfinał';return 'Runda'}
 async function drawBracket(){
@@ -185,6 +199,64 @@ async function setWinner(matchId,winnerId){
  const {error}=await db.from('salem_matches').update({winner_id:winnerId,status:'finished',match_status:'finished',updated_at:new Date().toISOString()}).eq('id',matchId);
  if(error)return toast('Nie udało się zapisać wyniku: '+error.message);
  await loadAll();await advanceIfReady();toast('Wynik zapisany.');
+}
+async function correctWinner(matchId,winnerId){
+ const match=matches.find(m=>m.id===matchId);if(!match||!match.winner_id)return;
+ if(winnerId===match.winner_id)return toast('Ten uczestnik jest już zapisany jako zwycięzca.');
+ const oldName=playerName(match.winner_id),newName=playerName(winnerId);
+ if(!confirm('Zmienić zwycięzcę pojedynku z '+oldName+' na '+newName+'? Jeśli ta zmiana unieważni późniejszy wynik, odpowiedni pojedynek zostanie ponownie otwarty.'))return;
+ const {error}=await db.from('salem_matches').update({winner_id:winnerId,status:'finished',match_status:'finished',updated_at:new Date().toISOString()}).eq('id',matchId);
+ if(error)return toast('Nie udało się poprawić wyniku: '+error.message);
+ await loadAll();
+ await propagateWinnerChange(match,winnerId);
+ await refreshTournamentState();
+ await loadAll();
+ toast('Wynik poprawiony. Zaktualizowano zależne pojedynki.');
+}
+async function propagateWinnerChange(sourceMatch,newWinnerId){
+ const sourceRound=rounds.find(r=>r.id===sourceMatch.round_id);if(!sourceRound)return;
+ let previousMatchNumber=sourceMatch.match_number;
+ let outgoing=newWinnerId;
+ let roundNumber=sourceRound.round_number;
+ while(true){
+  const nextRound=rounds.find(r=>r.round_number===roundNumber+1);
+  if(!nextRound)break;
+  const nextMatchNumber=Math.ceil(previousMatchNumber/2);
+  const nextMatch=matches.find(m=>m.round_id===nextRound.id&&m.match_number===nextMatchNumber);
+  if(!nextMatch)break;
+  const oldOutgoing=nextMatch.winner_id;
+  const patch=previousMatchNumber%2===1?{player1_id:outgoing}:{player2_id:outgoing};
+  const p1=patch.player1_id!==undefined?patch.player1_id:nextMatch.player1_id;
+  const p2=patch.player2_id!==undefined?patch.player2_id:nextMatch.player2_id;
+  let winner=nextMatch.winner_id;
+  let status='pending',match_status='pending';
+  if(p1&&!p2){winner=p1;status='bye';match_status='bye'}
+  else if(!p1&&p2){winner=p2;status='bye';match_status='bye'}
+  else if(p1&&p2){
+   if(winner!==p1&&winner!==p2)winner=null;
+   status=winner?'finished':'pending';match_status=winner?'finished':'pending';
+  }else{winner=null;status='pending';match_status='pending'}
+  const update={...patch,winner_id:winner,status,match_status,updated_at:new Date().toISOString()};
+  const {error}=await db.from('salem_matches').update(update).eq('id',nextMatch.id);
+  if(error){toast('Nie udało się zaktualizować kolejnej rundy: '+error.message);return}
+  if(oldOutgoing===winner)break;
+  previousMatchNumber=nextMatchNumber;
+  outgoing=winner;
+  roundNumber=nextRound.round_number;
+ }
+ await loadAll();
+}
+async function refreshTournamentState(){
+ if(!rounds.length)return;
+ for(const r of rounds){
+  const ms=matches.filter(m=>m.round_id===r.id);
+  const complete=ms.length>0&&ms.every(m=>!!m.winner_id);
+  await db.from('salem_rounds').update({status:complete?'finished':'active'}).eq('id',r.id);
+ }
+ const lastRound=rounds[rounds.length-1];
+ const finalMatches=matches.filter(m=>m.round_id===lastRound.id);
+ const finished=finalMatches.length>0&&finalMatches.every(m=>!!m.winner_id);
+ await db.from('salem_tournament').update({status:finished?'finished':'active',updated_at:new Date().toISOString()}).eq('id',true);
 }
 async function advanceIfReady(){
  if(!rounds.length)return;
