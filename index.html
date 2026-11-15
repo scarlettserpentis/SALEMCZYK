@@ -19,7 +19,7 @@ input,textarea,select{background:#100b10;border:1px solid #694356;color:var(--te
 label{display:block;color:var(--muted);font:12px Arial;margin:8px 0 5px}.hidden{display:none!important}
 .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(125px,1fr));gap:10px}.stat{background:#130d14;border:1px solid var(--line);border-radius:8px;padding:12px;text-align:center}.stat strong{display:block;color:var(--gold2);font-size:25px}
 .bracket{display:flex;gap:14px;overflow-x:auto;padding:10px 2px 18px;align-items:flex-start}.round{min-width:225px;flex:1}.round h3{text-align:center;font-size:14px;letter-spacing:1px;text-transform:uppercase}.match{background:#150e16;border:1px solid var(--line);border-radius:8px;margin:12px 0;padding:10px}.player{display:flex;justify-content:space-between;gap:8px;padding:7px 5px;border-bottom:1px solid #382331}.player:last-child{border:0}.winner{color:var(--green);font-weight:bold}.tag{font:10px Arial;color:var(--gold);text-transform:uppercase;letter-spacing:1px}.empty{text-align:center;padding:28px;color:var(--muted);border:1px dashed var(--line);border-radius:8px}
-.small{font:12px Arial;color:var(--muted)}.notice{border-left:3px solid var(--gold);padding:9px 12px;background:#2a1b25;color:#e7d8c4;margin:10px 0}.status{display:inline-block;border:1px solid var(--line);border-radius:99px;padding:4px 10px;font:11px Arial;color:var(--gold2)}.match-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.match-actions button{font-size:12px;padding:7px 9px}
+.small{font:12px Arial;color:var(--muted)}.notice{border-left:3px solid var(--gold);padding:9px 12px;background:#2a1b25;color:#e7d8c4;margin:10px 0}.status{display:inline-block;border:1px solid var(--line);border-radius:99px;padding:4px 10px;font:11px Arial;color:var(--gold2)}.match-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.match-actions button{font-size:12px;padding:7px 9px}.match-tools{margin-top:10px;padding-top:9px;border-top:1px solid #382331}.match-tools label{margin-top:6px}.match-tools button{margin-top:8px;width:100%}.match-meta{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.state-pill{display:inline-block;border:1px solid #694356;border-radius:99px;padding:3px 8px;font:10px Arial;color:var(--gold2)}.schedule-list{display:grid;gap:8px}.schedule-item,.history-item{background:#150e16;border:1px solid var(--line);border-radius:8px;padding:10px}.schedule-item strong,.history-item strong{color:var(--gold2)}.history-list{display:grid;gap:8px}
 #toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:#2c1a27;border:1px solid var(--gold);padding:10px 16px;border-radius:8px;display:none;z-index:10;max-width:90vw}
 @media(max-width:600px){header{padding-top:22px}.panel{padding:14px}.row{display:block}.row>*{margin:5px 0}.round{min-width:210px}}
 </style>
@@ -32,6 +32,8 @@ label{display:block;color:var(--muted);font:12px Arial;margin:8px 0 5px}.hidden{
  <div class="panel"><div class="row"><div><h2>Witaj na arenie Salem</h2><div class="muted">Śledź pojedynki, wyniki i drogę uczestników do finału.</div></div><div style="text-align:right"><span class="status" id="statusLabel">Ładowanie…</span></div></div>
  <div class="stats" style="margin-top:16px"><div class="stat"><strong id="pCount">0</strong><span class="small">uczestników</span></div><div class="stat"><strong id="mCount">0</strong><span class="small">pojedynków</span></div><div class="stat"><strong id="rCount">0</strong><span class="small">rund</span></div><div class="stat"><strong id="doneCount">0</strong><span class="small">rozegranych</span></div></div></div>
  <div class="panel"><h2>Drabinka turniejowa</h2><div id="publicBracket" class="empty">Pobieranie danych…</div></div>
+ <div class="panel"><h2>Harmonogram pojedynków</h2><div id="publicSchedule" class="empty">Nie zaplanowano jeszcze pojedynków.</div></div>
+ <div class="panel"><h2>Historia wyników</h2><div id="publicHistory" class="empty">Nie rozegrano jeszcze pojedynków.</div></div>
  <div class="panel"><h2>Informacje</h2><p class="muted">Wyniki zatwierdza organizatorka turnieju. Tablica odświeża się automatycznie.</p><p class="small" id="lastUpdated"></p></div>
 </section>
 <section id="adminView" class="hidden">
@@ -67,6 +69,21 @@ async function loadAll(){
 }
 function playerName(id){return participants.find(p=>p.id===id)?.name||'—'}
 function roundLabel(r){return r.label||('Runda '+r.round_number)}
+function matchState(m){
+ if(m.status==='bye')return 'Wolny los';
+ if(m.winner_id)return 'Zakończony';
+ const s=m.match_status||(m.scheduled_at?'scheduled':'pending');
+ return ({pending:'Do rozegrania',scheduled:'Zaplanowany',in_progress:'W trakcie',finished:'Zakończony',bye:'Wolny los'})[s]||'Do rozegrania';
+}
+function localDateValue(iso){
+ if(!iso)return '';
+ const d=new Date(iso);if(Number.isNaN(d.getTime()))return '';
+ return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16);
+}
+function displayDate(iso){
+ if(!iso)return '';
+ const d=new Date(iso);return Number.isNaN(d.getTime())?'':d.toLocaleString('pl-PL',{dateStyle:'medium',timeStyle:'short'});
+}
 function renderBracket(target,admin){
  if(!rounds.length){target.className='empty';target.textContent='Drabinka pojawi się po dodaniu uczestników i wylosowaniu par.';return}
  target.className='bracket';
@@ -77,18 +94,50 @@ function renderBracket(target,admin){
    return `<div class="match"><div class="tag">Pojedynek ${m.match_number}${m.status==='bye'?' · wolny los':''}</div>
     <div class="player ${m.winner_id===m.player1_id&&m.winner_id?'winner':''}"><span>${esc(a)}</span>${m.winner_id===m.player1_id&&m.winner_id?'✓':''}</div>
     <div class="player ${m.winner_id===m.player2_id&&m.winner_id?'winner':''}"><span>${esc(b)}</span>${m.winner_id===m.player2_id&&m.winner_id?'✓':''}</div>
-    ${m.scheduled_at?`<div class="small">Termin: ${new Date(m.scheduled_at).toLocaleString('pl-PL')}</div>`:''}
-    ${admin&&m.status==='pending'&&m.player1_id&&m.player2_id?`<div class="small" style="margin-top:8px">Zatwierdź zwycięzcę:</div><div class="match-actions"><button class="secondary" data-win="${m.id}" data-player="${m.player1_id}">${esc(a)}</button><button class="secondary" data-win="${m.id}" data-player="${m.player2_id}">${esc(b)}</button></div>`:''}
+    <div class="match-meta"><span class="state-pill">${esc(matchState(m))}</span>${m.scheduled_at?`<span class="small">Termin: ${esc(displayDate(m.scheduled_at))}</span>`:''}</div>
+    ${admin&&m.status!=='bye'?`<div class="match-tools">
+      <label>Termin pojedynku</label><input type="datetime-local" data-schedule="${m.id}" value="${localDateValue(m.scheduled_at)}">
+      <label>Status meczu</label><select data-match-status="${m.id}">
+       <option value="pending" ${(m.match_status||'pending')==='pending'?'selected':''}>Do rozegrania</option>
+       <option value="scheduled" ${(m.match_status||'')==='scheduled'?'selected':''}>Zaplanowany</option>
+       <option value="in_progress" ${(m.match_status||'')==='in_progress'?'selected':''}>W trakcie</option>
+       ${m.winner_id?'<option value="finished" selected>Zakończony</option>':''}
+      </select>
+      <button class="secondary" data-save-match="${m.id}">Zapisz termin i status</button>
+     </div>`:''}
+    ${admin&&m.status==='pending'&&!m.winner_id&&m.player1_id&&m.player2_id?`<div class="small" style="margin-top:8px">Zatwierdź zwycięzcę:</div><div class="match-actions"><button class="secondary" data-win="${m.id}" data-player="${m.player1_id}">${esc(a)}</button><button class="secondary" data-win="${m.id}" data-player="${m.player2_id}">${esc(b)}</button></div>`:''}
     ${m.winner_id?`<div class="tag" style="margin-top:8px">Awans: ${esc(playerName(m.winner_id))}</div>`:''}
    </div>`}).join('')}</div>`;
  }).join('');
- if(admin)target.querySelectorAll('[data-win]').forEach(b=>b.onclick=()=>setWinner(b.dataset.win,b.dataset.player));
+ if(admin){
+  target.querySelectorAll('[data-win]').forEach(b=>b.onclick=()=>setWinner(b.dataset.win,b.dataset.player));
+  target.querySelectorAll('[data-save-match]').forEach(b=>b.onclick=()=>saveMatchDetails(b.dataset.saveMatch));
+ }
+}
+function renderPublicLists(){
+ const upcoming=matches.filter(m=>m.status!=='bye'&&!m.winner_id&&m.scheduled_at)
+  .sort((a,b)=>new Date(a.scheduled_at)-new Date(b.scheduled_at));
+ const schedule=$('publicSchedule');
+ if(!upcoming.length){schedule.className='empty';schedule.textContent='Nie zaplanowano jeszcze pojedynków.'}
+ else{
+  schedule.className='schedule-list';
+  schedule.innerHTML=upcoming.map(m=>`<div class="schedule-item"><div class="tag">${esc(roundLabel(rounds.find(r=>r.id===m.round_id)||{}))} · Pojedynek ${m.match_number}</div><strong>${esc(playerName(m.player1_id))}</strong> <span class="muted">—</span> <strong>${esc(playerName(m.player2_id))}</strong><div class="small">${esc(displayDate(m.scheduled_at))} · ${esc(matchState(m))}</div></div>`).join('');
+ }
+ const completed=matches.filter(m=>m.winner_id&&m.status!=='bye')
+  .sort((a,b)=>new Date(b.updated_at||b.scheduled_at||0)-new Date(a.updated_at||a.scheduled_at||0));
+ const history=$('publicHistory');
+ if(!completed.length){history.className='empty';history.textContent='Nie rozegrano jeszcze pojedynków.'}
+ else{
+  history.className='history-list';
+  history.innerHTML=completed.map(m=>`<div class="history-item"><div class="tag">${esc(roundLabel(rounds.find(r=>r.id===m.round_id)||{}))} · Pojedynek ${m.match_number}</div><div>${esc(playerName(m.player1_id))} <span class="muted">—</span> ${esc(playerName(m.player2_id))}</div><strong>Zwycięzca: ${esc(playerName(m.winner_id))}</strong>${m.scheduled_at?`<div class="small">Termin: ${esc(displayDate(m.scheduled_at))}</div>`:''}</div>`).join('');
+ }
 }
 function render(){
  $('pCount').textContent=participants.length;$('mCount').textContent=matches.length;$('rCount').textContent=rounds.length;$('doneCount').textContent=matches.filter(m=>m.winner_id||m.status==='bye').length;
  $('statusLabel').textContent=tournament?.status==='finished'?'Turniej zakończony':tournament?.status==='active'?'Turniej trwa':'Zapisy / przygotowania';
  $('lastUpdated').textContent='Ostatnie odświeżenie: '+new Date().toLocaleTimeString('pl-PL');
  renderBracket($('publicBracket'),false);
+ renderPublicLists();
  if(session){renderBracket($('adminMatches'),true);$('participantList').innerHTML=participants.length?`<b>Na liście (${participants.length}):</b><ul>${participants.map(p=>`<li>${esc(p.name)} ${rounds.length?'':`<button class="danger" data-del="${p.id}" style="padding:3px 7px">Usuń</button>`}</li>`).join('')}</ul>`:'Lista uczestników jest pusta.';$('participantList').querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>deleteParticipant(b.dataset.del));$('tournamentName').value=tournament?.name||'Salemczyk'}
 }
 async function addParticipants(){
@@ -115,15 +164,25 @@ async function drawBracket(){
  const hasByes=players.length<size;
  const firstLabel=hasByes?'Runda wstępna':labelFor(matchCount);
  const {data:r,error:re}=await db.from('salem_rounds').insert({round_number:1,label:firstLabel,status:'active'}).select().single();if(re)return toast(re.message);
- let rows=[];for(let i=0;i<matchCount;i++){let a=slots[i*2]||null,b=slots[i*2+1]||null;rows.push({round_id:r.id,match_number:i+1,player1_id:a,player2_id:b,winner_id:a&&!b?a:(!a&&b?b:null),status:(a&&!b)||(!a&&b)?'bye':'pending'})}
+ let rows=[];for(let i=0;i<matchCount;i++){let a=slots[i*2]||null,b=slots[i*2+1]||null;rows.push({round_id:r.id,match_number:i+1,player1_id:a,player2_id:b,winner_id:a&&!b?a:(!a&&b?b:null),status:(a&&!b)||(!a&&b)?'bye':'pending',match_status:(a&&!b)||(!a&&b)?'bye':'pending'})}
  const {error:me}=await db.from('salem_matches').insert(rows);if(me)return toast(me.message);
  await db.from('salem_tournament').update({status:'active',updated_at:new Date().toISOString()}).eq('id',true);
  await loadAll();await advanceIfReady();toast('Drabinka została utworzona!');
 }
+async function saveMatchDetails(matchId){
+ const match=matches.find(m=>m.id===matchId);if(!match)return;
+ const dateInput=document.querySelector(`[data-schedule="${matchId}"]`);
+ const statusInput=document.querySelector(`[data-match-status="${matchId}"]`);
+ const scheduled_at=dateInput?.value?new Date(dateInput.value).toISOString():null;
+ const match_status=match.winner_id?'finished':(statusInput?.value||'pending');
+ const {error}=await db.from('salem_matches').update({scheduled_at,match_status,updated_at:new Date().toISOString()}).eq('id',matchId);
+ if(error)return toast('Nie udało się zapisać meczu: '+error.message);
+ await loadAll();toast('Zapisano termin i status pojedynku.');
+}
 async function setWinner(matchId,winnerId){
  const match=matches.find(m=>m.id===matchId);if(!match||match.winner_id)return;
  if(!confirm('Zatwierdzić zwycięstwo: '+playerName(winnerId)+'?'))return;
- const {error}=await db.from('salem_matches').update({winner_id:winnerId,status:'finished',updated_at:new Date().toISOString()}).eq('id',matchId);
+ const {error}=await db.from('salem_matches').update({winner_id:winnerId,status:'finished',match_status:'finished',updated_at:new Date().toISOString()}).eq('id',matchId);
  if(error)return toast('Nie udało się zapisać wyniku: '+error.message);
  await loadAll();await advanceIfReady();toast('Wynik zapisany.');
 }
